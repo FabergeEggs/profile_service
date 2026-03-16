@@ -1,8 +1,15 @@
-from pydantic import BaseModel, Field
-from uuid import UUID
-from typing import Optional, List
-from datetime import datetime
+from pydantic import BaseModel  #, Field
+# from uuid import UUID
+# from typing import Optional, List
+# from datetime import datetime
 
+class User(BaseModel):
+    name: str
+    email: str
+    description: str
+
+# DTO examples from project service
+"""
 class TagDTO(BaseModel):
     id: UUID
     name: str
@@ -76,3 +83,4 @@ class ProjectStatsDTO(BaseModel):
     tasks_count: int
     participants_count: int
     answers_count: int
+"""
