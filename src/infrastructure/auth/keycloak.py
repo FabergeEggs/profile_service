@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Any
 from uuid import UUID
@@ -11,8 +11,8 @@ security = HTTPBearer(auto_error=False)
 
 class KeycloakAuth:
     def __init__(self):
-        self.skip_auth = os.getenv("SKIP_AUTH", "true").lower() == "true"
-        self.keycloak_url = os.getenv("KEYCLOAK_URL", "http://host.docker.internal:8082")
+        self.skip_auth = os.getenv("SKIP_AUTH", "false").lower() == "true"
+        self.keycloak_url = os.getenv("KEYCLOAK_URL", "http://keycloak:8080")
         self.realm = os.getenv("KEYCLOAK_REALM", "myrealm")
     
     def _get_public_key(self):
@@ -24,8 +24,8 @@ class KeycloakAuth:
             jwks = response.json()
             for key in jwks.get("keys", []):
                 if key.get("alg") == "RS256" or key.get("use") == "sig":
-                    from jwt.algorithms import RSAAlgorithm
-                    return RSAAlgorithm.from_jwt(json.dumps(key))
+                    from jwt import PyJWK
+                    return PyJWK.from_json(json.dumps(key)).key
             raise Exception("No signing key found")
         except Exception as e:
             print(f"Error getting public key: {e}")

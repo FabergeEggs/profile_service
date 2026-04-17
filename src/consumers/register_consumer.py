@@ -18,10 +18,11 @@ async def handle_user_registered(event_data: Dict[str, Any]) -> None:
         # Extract user data from event
         user_data = event_data.get("data", {})
         user_id = UUID(user_data.get("user_id"))
-        username = user_data.get("username")
         email = user_data.get("email")
+        # username = email (так как в Keycloak username = email)
+        username = email
         
-        if not all([user_id, username, email]):
+        if not all([user_id, email]):
             raise InvalidProfileDataError("Missing required user data")
         
         async with AsyncSessionLocal() as db:
@@ -32,10 +33,9 @@ async def handle_user_registered(event_data: Dict[str, Any]) -> None:
             profile = await profile_service.create_profile(user_id, username, email)
             await db.commit()
             
-            print(f"Profile created for user: {user_id} (username: {username})")
+            print(f"Profile created for user: {user_id} (email: {email})")
             
     except InvalidProfileDataError as e:
         print(f"Invalid registration data: {e}")
     except Exception as e:
         print(f"Error creating profile: {e}")
-        # Optionally send to dead letter queue
