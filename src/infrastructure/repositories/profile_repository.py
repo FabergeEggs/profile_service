@@ -45,6 +45,7 @@ class PostgresProfileRepository(ProfileRepository):
         model.avatar_url = profile.avatar_url
         
         await self.session.flush()
+        await self.session.commit()  
         return self._to_entity(model)
     
     async def delete(self, user_id: UUID) -> bool:
