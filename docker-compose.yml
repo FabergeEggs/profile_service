@@ -1,0 +1,113 @@
+services:
+  profile-service:
+    build: .
+    container_name: profile-service
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://profile_user:profile_pass@postgres-profile:5432/profile_db
+      - REDPANDA_BOOTSTRAP_SERVERS=redpanda:9092
+      - REDPANDA_CONSUMER_GROUP=profile-service-group
+      - KEYCLOAK_URL=http://host.docker.internal:8082
+      - KEYCLOAK_REALM=master
+      - KEYCLOAK_CLIENT_ID=profile-service
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-dummy-secret}
+      - MEDIA_SERVICE_URL=http://media-service:8000
+      - SERVICE_ID=profile-service
+      - SKIP_AUTH=true
+    env_file:
+      - .env
+    depends_on:
+      postgres-profile:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - profile-network
+
+  postgres-profile:
+    image: postgres:15-alpine
+    container_name: postgres-profile
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=profile_user
+      - POSTGRES_PASSWORD=profile_pass
+      - POSTGRES_DB=profile_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_profile_data:/var/lib/postgresql/data
+    networks:
+      - profile-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U profile_user -d profile_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.2.2
+    container_name: profile-redpanda
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092
+      - --advertise-kafka-addr internal://redpanda:9092
+      - --overprovisioned
+      - --smp 1
+      - --memory 1G
+    ports:
+      - "9093:9092"
+      - "9645:9644"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    networks:
+      - profile-network
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.3.2
+    container_name: profile-redpanda-console
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    environment:
+      - KAFKA_BROKERS=redpanda:9092
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - profile-network
+
+  media-service:
+    image: python:3.11-slim
+    container_name: profile-media-service
+    restart: unless-stopped
+    working_dir: /app
+    command: python -m http.server 8000
+    ports:
+      - "8002:8000"
+    networks:
+      - profile-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  profile-network:
+    driver: bridge
+
+volumes:
+  postgres_profile_data:
+  redpanda_data:

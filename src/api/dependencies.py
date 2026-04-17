@@ -1,31 +1,22 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from domain.interfaces import AuthenticationService
-from domain.exceptions import AuthenticationError
-from domain.entities import User
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.infrastructure.database.session import get_db
+from src.infrastructure.repositories.profile_repository import PostgresProfileRepository
+from src.infrastructure.message_broker.producer import KafkaEventProducer
+from src.infrastructure.clients.media_client import MediaServiceHTTPClient
+from src.infrastructure.auth.keycloak import keycloak_auth
+from src.application.usecases.profile_service import ProfileService
+from uuid import UUID
 
-security = HTTPBearer(auto_error=False)
+# Singleton instances
+_event_producer = KafkaEventProducer()
+_media_client = MediaServiceHTTPClient()
 
-def get_auth_service() -> AuthenticationService:
-    # Фабрика – подстановка реальной реализации
-    from infrastructure.auth.keycloak_service import KeycloakAuthService
-    return KeycloakAuthService()
+async def get_profile_service(db: AsyncSession = Depends(get_db)) -> ProfileService:
+    """Dependency for ProfileService with real implementations"""
+    repository = PostgresProfileRepository(db)
+    return ProfileService(repository, _event_producer, _media_client)
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthenticationService = Depends(get_auth_service)
-) -> User:
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    try:
-        return await auth_service.authenticate(credentials.credentials)
-    except AuthenticationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+async def get_current_user(token_data = Depends(keycloak_auth.verify_token)) -> UUID:
+    """Extract current user ID from Keycloak token"""
+    return keycloak_auth.get_user_id(token_data)

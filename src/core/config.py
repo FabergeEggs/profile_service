@@ -1,13 +1,41 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
+from typing import Optional
 
 class Settings(BaseSettings):
-    KEYCLOAK_URL: str = "http://localhost:8080"
-    KEYCLOAK_REALM: str = "myrealm"
-    KEYCLOAK_CLIENT_ID: str = "myclient"
-    KEYCLOAK_CLIENT_SECRET: str = "secret"          # если требуется для обмена кода
-    KEYCLOAK_ALGORITHMS: list[str] = ["RS256"]
+    # Database
+    database_url: str = Field(validation_alias="DATABASE_URL")
     
-    class Config:
-        env_file = ".env"
+    # RedPanda
+    redpanda_bootstrap_servers: str = Field(
+        default="localhost:9092",
+        validation_alias="REDPANDA_BOOTSTRAP_SERVERS"
+    )
+    redpanda_consumer_group: str = Field(
+        default="profile-service-group",
+        validation_alias="REDPANDA_CONSUMER_GROUP"
+    )
+    
+    # Keycloak
+    keycloak_url: str = Field(validation_alias="KEYCLOAK_URL")
+    keycloak_realm: str = Field(validation_alias="KEYCLOAK_REALM")
+    keycloak_client_id: str = Field(validation_alias="KEYCLOAK_CLIENT_ID")
+    keycloak_client_secret: str = Field(validation_alias="KEYCLOAK_CLIENT_SECRET")
+    
+    # Media Service
+    media_service_url: str = Field(validation_alias="MEDIA_SERVICE_URL")
+    
+    # Service
+    service_id: str = Field(
+        default="profile-service",
+        validation_alias="SERVICE_ID"
+    )
+    
+    model_config = {
+        "env_file": ".env",
+        "extra": "ignore",
+        "populate_by_name": True,  # Позволяет использовать имена полей
+        "case_sensitive": False
+    }
 
 settings = Settings()
