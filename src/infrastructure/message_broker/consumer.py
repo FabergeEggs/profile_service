@@ -19,8 +19,8 @@ class KafkaConsumer:
         """Start consuming messages"""
         self.consumer = AIOKafkaConsumer(
             self.topic,
-            bootstrap_servers=settings.redpanda_bootstrap_servers,  # Исправлено: settings (объект), не Settings (класс)
-            group_id=settings.redpanda_consumer_group,              # Исправлено: settings (объект)
+            bootstrap_servers=settings.redpanda_bootstrap_servers,  
+            group_id=settings.redpanda_consumer_group,              
             value_deserializer=lambda v: json.loads(v.decode()),
             auto_offset_reset="earliest",
             enable_auto_commit=False  

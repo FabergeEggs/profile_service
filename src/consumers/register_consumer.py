@@ -8,19 +8,19 @@ from src.infrastructure.message_broker.producer import KafkaEventProducer
 from src.infrastructure.clients.media_client import MediaServiceHTTPClient
 from src.domain.exceptions import InvalidProfileDataError
 
-# Shared instances
 _event_producer = KafkaEventProducer()
 _media_client = MediaServiceHTTPClient()
 
 async def handle_user_registered(event_data: Dict[str, Any]) -> None:
     """Handle keycloak.user.registered event"""
     try:
-        # Extract user data from event
         user_data = event_data.get("data", {})
         user_id = UUID(user_data.get("user_id"))
         email = user_data.get("email")
-        # username = email (так как в Keycloak username = email)
         username = email
+        first_name = user_data.get("first_name")
+        last_name = user_data.get("last_name")
+        about = user_data.get("about")  
         
         if not all([user_id, email]):
             raise InvalidProfileDataError("Missing required user data")
@@ -29,13 +29,17 @@ async def handle_user_registered(event_data: Dict[str, Any]) -> None:
             repository = PostgresProfileRepository(db)
             profile_service = ProfileService(repository, _event_producer, _media_client)
             
-            # Create profile for new user
-            profile = await profile_service.create_profile(user_id, username, email)
+            profile = await profile_service.create_profile(
+                user_id=user_id,
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                bio=about
+            )
             await db.commit()
             
             print(f"Profile created for user: {user_id} (email: {email})")
             
-    except InvalidProfileDataError as e:
-        print(f"Invalid registration data: {e}")
     except Exception as e:
         print(f"Error creating profile: {e}")
