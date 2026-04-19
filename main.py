@@ -10,6 +10,8 @@ from src.consumers.register_consumer import handle_user_registered
 import uvicorn
 import os
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # Global instances
 event_producer = KafkaEventProducer()
 user_consumer = KafkaConsumer("keycloak.user.registered", handle_user_registered)
@@ -43,6 +45,14 @@ app = FastAPI(
     description="User profile management service",
     version="1.0.0",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(router)

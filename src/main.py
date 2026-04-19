@@ -8,6 +8,7 @@ from src.infrastructure.database.session import engine
 from src.infrastructure.database.models import Base
 import asyncio
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 # Global instances
 event_producer = KafkaEventProducer()
@@ -42,6 +43,16 @@ app = FastAPI(
     description="User profile management service",
     version="1.0.0",
     lifespan=lifespan
+)
+
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(router)
