@@ -8,11 +8,12 @@ from typing import Dict, Any
 from src.domain.interfaces import EventProducer
 from src.core.config import settings
 
+
 class KafkaEventProducer(EventProducer):
     def __init__(self):
         self.producer = None
         self._started = False
-    
+
     async def start(self):
         for i in range(10):
             try:
@@ -29,20 +30,20 @@ class KafkaEventProducer(EventProducer):
                 await asyncio.sleep(3)
         print("Kafka unavailable, continuing without producer")
         self._started = False
-    
+
     async def stop(self):
         if self.producer and self._started:
             await self.producer.stop()
-    
-    async def send_event(self, event_type: str, data: Dict[str, Any]) -> None:
+
+    async def send_event(self, topic: str, event_type: str, data: Dict[str, Any]) -> None:
         if not self._started:
             print(f"Producer not started, skipping event")
             return  # НЕ падать!
-        
+
         event = {
             "event_id": str(uuid4()),
             "event_type": event_type,
             "timestamp": datetime.utcnow().isoformat(),
-            "data": data
+            **data
         }
-        await self.producer.send("profile_service.profile.changed", event)
+        await self.producer.send(topic, event)
