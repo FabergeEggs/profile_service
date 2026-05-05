@@ -1,10 +1,10 @@
-"""Base message broker consumer utility"""
-
 from aiokafka import AIOKafkaConsumer
 import json
 from typing import Callable, Awaitable, Dict, Any
 import asyncio
 from src.core.config import settings  
+import logging
+logger = logging.getLogger(__name__)
 
 class KafkaConsumer:
     """Generic Kafka consumer wrapper (infrastructure utility)"""
@@ -22,7 +22,7 @@ class KafkaConsumer:
             bootstrap_servers=settings.redpanda_bootstrap_servers,  
             group_id=settings.redpanda_consumer_group,              
             value_deserializer=lambda v: json.loads(v.decode()),
-            auto_offset_reset="earliest",
+            auto_offset_reset="latest",
             enable_auto_commit=False  
         )
         await self.consumer.start()
@@ -31,6 +31,7 @@ class KafkaConsumer:
         # Start consumption loop
         asyncio.create_task(self._consume())
         print(f"Started consumer for topic: {self.topic}")
+        logger.info(f"Started consumer for topic: {self.topic}")
     
     async def _consume(self):
         """Main consumption loop"""

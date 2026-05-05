@@ -26,7 +26,7 @@ class KafkaEventProducer(EventProducer):
                 print(f"Kafka producer started (attempt {i+1})")
                 return
             except Exception as e:
-                print(f"⏳ Waiting for Kafka... ({i+1}/10): {e}")
+                print(f"Waiting for Kafka... ({i+1}/10): {e}")
                 await asyncio.sleep(3)
         print("Kafka unavailable, continuing without producer")
         self._started = False

@@ -14,13 +14,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Global instances
 event_producer = KafkaEventProducer()
-user_consumer = KafkaConsumer("keycloak.user.registered", handle_user_registered)
+user_consumer = KafkaConsumer("user.created", handle_user_registered)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
-    print("🚀 Starting Profile Service...")
+    print("Starting Profile Service...")
     
     # Initialize producer (only if Kafka enabled)
     if os.getenv("DISABLE_KAFKA", "false").lower() != "true":
@@ -30,12 +30,12 @@ async def lifespan(app: FastAPI):
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        print("✅ Database tables created")
+        print("Database tables created")
     
     yield
     
     # Shutdown
-    print("🛑 Shutting down...")
+    print("Shutting down...")
     if os.getenv("DISABLE_KAFKA", "false").lower() != "true":
         await event_producer.stop()
         await user_consumer.stop()

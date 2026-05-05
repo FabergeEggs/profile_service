@@ -12,7 +12,6 @@ _event_producer = KafkaEventProducer()
 _media_client = MediaServiceHTTPClient()
 
 async def handle_user_registered(event_data: Dict[str, Any]) -> None:
-    """Handle keycloak.user.registered event"""
     try:
         user_data = event_data.get("data", {})
         user_id = UUID(user_data.get("user_id"))
