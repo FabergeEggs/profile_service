@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Global instances
 event_producer = KafkaEventProducer()
-user_consumer = KafkaConsumer("keycloak.user.registered", handle_user_registered)
+user_consumer = KafkaConsumer("user.created", handle_user_registered)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
