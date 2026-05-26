@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     
     # Media Service
     media_service_url: str = Field(validation_alias="MEDIA_SERVICE_URL")
+    media_service_token: str = Field(
+        default="",
+        validation_alias="MEDIA_SERVICE_TOKEN"
+    )
     
     # Service
     service_id: str = Field(
