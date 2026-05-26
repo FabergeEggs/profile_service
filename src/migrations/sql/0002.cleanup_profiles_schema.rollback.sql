@@ -1,0 +1,1 @@
+-- Legacy column cleanup is not restored on rollback.

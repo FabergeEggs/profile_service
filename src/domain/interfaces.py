@@ -22,10 +22,11 @@ class ProfileRepository(ABC):
 
 class EventProducer(ABC):
     @abstractmethod
-    async def send_event(self, event_type: str, data: Dict[str, Any]) -> None:
-        pass
-
-class MediaServiceClient(ABC):
-    @abstractmethod
-    async def delete_avatar(self, avatar_url: str) -> bool:
+    async def send_event(
+        self,
+        *,
+        topic: str,
+        event_type: str,
+        data: Dict[str, Any],
+    ) -> None:
         pass

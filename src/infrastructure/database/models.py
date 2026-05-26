@@ -16,6 +16,5 @@ class ProfileModel(Base):
     first_name = Column(String(100))
     last_name = Column(String(100))
     bio = Column(String(500))
-    avatar_url = Column(String(500))
     created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=datetime.utcnow)

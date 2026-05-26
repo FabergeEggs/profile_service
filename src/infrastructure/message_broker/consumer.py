@@ -30,8 +30,7 @@ class KafkaConsumer:
         
         # Start consumption loop
         asyncio.create_task(self._consume())
-        print(f"Started consumer for topic: {self.topic}")
-        logger.info(f"Started consumer for topic: {self.topic}")
+        logger.info("Started consumer for topic: %s", self.topic)
     
     async def _consume(self):
         """Main consumption loop"""
@@ -43,11 +42,11 @@ class KafkaConsumer:
                     await self.handler(msg.value)
                     await self.consumer.commit()
                 except Exception as e:
-                    print(f"Error handling message: {e}")
+                    logger.exception("Error handling message on %s: %s", self.topic, e)
         except asyncio.CancelledError:
-            print(f"Consumer task cancelled for topic: {self.topic}")
+            logger.info("Consumer task cancelled for topic: %s", self.topic)
         except Exception as e:
-            print(f"Consumer error for topic {self.topic}: {e}")
+            logger.exception("Consumer error for topic %s: %s", self.topic, e)
         finally:
             await self.stop()
     
@@ -56,4 +55,4 @@ class KafkaConsumer:
         self._running = False
         if self.consumer:
             await self.consumer.stop()
-            print(f"Stopped consumer for topic: {self.topic}")
+            logger.info("Stopped consumer for topic: %s", self.topic)

@@ -1,44 +1,53 @@
-import json
+import logging
 from typing import Dict, Any
 from uuid import UUID
+
 from src.application.usecases.profile_service import ProfileService
 from src.infrastructure.database.session import AsyncSessionLocal
 from src.infrastructure.repositories.profile_repository import PostgresProfileRepository
-from src.infrastructure.message_broker.producer import KafkaEventProducer
-from src.infrastructure.clients.media_client import MediaServiceHTTPClient
+from src.infrastructure.message_broker.producer import get_event_producer
 from src.domain.exceptions import InvalidProfileDataError
 
-_event_producer = KafkaEventProducer()
-_media_client = MediaServiceHTTPClient()
+logger = logging.getLogger(__name__)
+
+
+def _extract_user_payload(event_data: Dict[str, Any]) -> Dict[str, Any]:
+    """auth_service wraps fields in ``data``; support both shapes."""
+    nested = event_data.get("data")
+    if isinstance(nested, dict) and nested.get("user_id"):
+        return nested
+    return event_data
+
 
 async def handle_user_registered(event_data: Dict[str, Any]) -> None:
-    try:
-        user_data = event_data.get("data", {})
-        user_id = UUID(user_data.get("user_id"))
-        email = user_data.get("email")
-        username = email
-        first_name = user_data.get("first_name")
-        last_name = user_data.get("last_name")
-        about = user_data.get("about")  
-        
-        if not all([user_id, email]):
-            raise InvalidProfileDataError("Missing required user data")
-        
-        async with AsyncSessionLocal() as db:
+    user_data = _extract_user_payload(event_data)
+    user_id_raw = user_data.get("user_id")
+    email = user_data.get("email")
+
+    if not user_id_raw or not email:
+        raise InvalidProfileDataError("Missing required user data: user_id and email")
+
+    user_id = UUID(str(user_id_raw))
+    first_name = user_data.get("first_name") or ""
+    last_name = user_data.get("last_name") or ""
+    bio = user_data.get("about") or ""
+
+    async with AsyncSessionLocal() as db:
+        try:
             repository = PostgresProfileRepository(db)
-            profile_service = ProfileService(repository, _event_producer, _media_client)
-            
-            profile = await profile_service.create_profile(
+            profile_service = ProfileService(repository, get_event_producer())
+
+            await profile_service.create_profile(
                 user_id=user_id,
-                username=username,
+                username=email,
                 email=email,
                 first_name=first_name,
                 last_name=last_name,
-                bio=about
+                bio=bio,
             )
             await db.commit()
-            
-            print(f"Profile created for user: {user_id} (email: {email})")
-            
-    except Exception as e:
-        print(f"Error creating profile: {e}")
+            logger.info("Profile created for user %s (email: %s)", user_id, email)
+        except Exception as e:
+            await db.rollback()
+            logger.exception("Error creating profile for user %s: %s", user_id, e)
+            raise

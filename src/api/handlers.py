@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
+
 from src.api.dto import ProfileResponseDTO, ProfileUpdateDTO, ErrorResponseDTO
 from src.api.dependencies import get_profile_service, get_current_user
 from src.application.usecases.profile_service import ProfileService
-from src.domain.exceptions import ProfileNotFoundError, UnauthorizedAccessError, InvalidProfileDataError
+from src.domain.exceptions import ProfileNotFoundError, InvalidProfileDataError
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -11,20 +12,18 @@ router = APIRouter(prefix="/profile", tags=["profile"])
 @router.get(
     "/{user_id}",
     response_model=ProfileResponseDTO,
-    responses={404: {"model": ErrorResponseDTO},
-               403: {"model": ErrorResponseDTO}}
+    responses={404: {"model": ErrorResponseDTO}, 403: {"model": ErrorResponseDTO}},
 )
 async def get_profile(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user),
-    profile_service: ProfileService = Depends(get_profile_service)
+    profile_service: ProfileService = Depends(get_profile_service),
 ):
-    """Get profile by user ID"""
-    # Authorization
+    """Свой профиль (только свой user_id, JWT)."""
     if current_user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only access your own profile"
+            detail="You can only access your own profile",
         )
 
     try:
@@ -36,69 +35,63 @@ async def get_profile(
     except ProfileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=str(e),
         )
 
 
 @router.put(
     "/{user_id}",
     response_model=ProfileResponseDTO,
-    responses={404: {"model": ErrorResponseDTO},
-               400: {"model": ErrorResponseDTO}}
+    responses={404: {"model": ErrorResponseDTO}, 400: {"model": ErrorResponseDTO}},
 )
 async def update_profile(
     user_id: UUID,
     updates: ProfileUpdateDTO,
     current_user_id: UUID = Depends(get_current_user),
-    profile_service: ProfileService = Depends(get_profile_service)
+    profile_service: ProfileService = Depends(get_profile_service),
 ):
-    """Update profile"""
     if current_user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own profile"
+            detail="You can only update your own profile",
         )
 
     try:
-        # Filter out None values
-        update_data = {k: v for k, v in updates.dict().items()
-                       if v is not None}
+        update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
         profile = await profile_service.update_profile(user_id, update_data)
         return ProfileResponseDTO.model_validate(profile)
     except ProfileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=str(e),
         )
     except InvalidProfileDataError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=str(e),
         )
 
 
 @router.delete(
     "/{user_id}",
-    responses={404: {"model": ErrorResponseDTO},
-               200: {"description": "Profile deleted"}}
+    responses={404: {"model": ErrorResponseDTO}, 200: {"description": "Profile deleted"}},
 )
 async def delete_profile(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user),
-    profile_service: ProfileService = Depends(get_profile_service)
+    profile_service: ProfileService = Depends(get_profile_service),
 ):
-    """Delete profile"""
     if current_user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delete your own profile"
+            detail="You can only delete your own profile",
         )
 
     deleted = await profile_service.delete_profile(user_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found"
+            detail="Profile not found",
         )
 
     return {"message": "Profile deleted successfully"}

@@ -1,17 +1,28 @@
-# src/infrastructure/message_broker/producer.py
 from aiokafka import AIOKafkaProducer
 import json
 import asyncio
 from uuid import uuid4
-from datetime import datetime
-from typing import Dict, Any
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional
 from src.domain.interfaces import EventProducer
 from src.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+_event_producer: Optional["KafkaEventProducer"] = None
+
+
+def get_event_producer() -> "KafkaEventProducer":
+    global _event_producer
+    if _event_producer is None:
+        _event_producer = KafkaEventProducer()
+    return _event_producer
 
 
 class KafkaEventProducer(EventProducer):
     def __init__(self):
-        self.producer = None
+        self.producer: Optional[AIOKafkaProducer] = None
         self._started = False
 
     async def start(self):
@@ -19,31 +30,38 @@ class KafkaEventProducer(EventProducer):
             try:
                 self.producer = AIOKafkaProducer(
                     bootstrap_servers=settings.redpanda_bootstrap_servers,
-                    value_serializer=lambda v: json.dumps(v).encode()
+                    value_serializer=lambda v: json.dumps(v).encode(),
                 )
                 await self.producer.start()
                 self._started = True
-                print(f"Kafka producer started (attempt {i+1})")
+                logger.info("Kafka producer started (attempt %s)", i + 1)
                 return
             except Exception as e:
-                print(f"Waiting for Kafka... ({i+1}/10): {e}")
+                logger.warning("Waiting for Kafka (%s/10): %s", i + 1, e)
                 await asyncio.sleep(3)
-        print("Kafka unavailable, continuing without producer")
+        logger.error("Kafka unavailable, continuing without producer")
         self._started = False
 
     async def stop(self):
         if self.producer and self._started:
             await self.producer.stop()
+            self._started = False
 
-    async def send_event(self, topic: str, event_type: str, data: Dict[str, Any]) -> None:
-        if not self._started:
-            print(f"Producer not started, skipping event")
-            return  # НЕ падать!
+    async def send_event(
+        self,
+        *,
+        topic: str,
+        event_type: str,
+        data: Dict[str, Any],
+    ) -> None:
+        if not self._started or self.producer is None:
+            logger.warning("Producer not started, skipping event")
+            return
 
         event = {
             "event_id": str(uuid4()),
             "event_type": event_type,
-            "timestamp": datetime.utcnow().isoformat(),
-            **data
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **data,
         }
-        await self.producer.send(topic, event)
+        await self.producer.send_and_wait(topic, event)

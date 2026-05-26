@@ -1,8 +1,9 @@
 from uuid import UUID
 from typing import Optional, Dict, Any
 from src.domain.entities import Profile
-from src.domain.interfaces import ProfileRepository, EventProducer, MediaServiceClient
+from src.domain.interfaces import ProfileRepository, EventProducer
 from src.domain.exceptions import ProfileNotFoundError, InvalidProfileDataError
+from src import kafka_topics as topics
 
 
 class ProfileService:
@@ -11,29 +12,34 @@ class ProfileService:
         self,
         repository: ProfileRepository,
         event_producer: EventProducer,
-        media_client: MediaServiceClient
     ):
         self.repository = repository
         self.event_producer = event_producer
-        self.media_client = media_client
 
     async def get_profile(self, user_id: UUID) -> Optional[Profile]:
-        """Use case: Get profile by user ID"""
         return await self.repository.get_by_user_id(user_id)
 
-    async def create_profile(self, user_id: UUID, username: str, email: str,
-                             first_name: str = "", last_name: str = "",
-                             bio: str = "") -> Profile:
-        """Use case: Create new profile"""
+    async def create_profile(
+        self,
+        user_id: UUID,
+        username: str,
+        email: str,
+        first_name: str = "",
+        last_name: str = "",
+        bio: str = "",
+    ) -> Profile:
+        existing = await self.repository.get_by_user_id(user_id)
+        if existing:
+            return existing
+
         profile = Profile(
             id=None,
             user_id=user_id,
             username=username,
             email=email,
-            first_name=first_name,
-            last_name=last_name,
-            bio=bio,
-            avatar_url=None
+            first_name=first_name or "",
+            last_name=last_name or "",
+            bio=bio or "",
         )
         return await self.repository.create(profile)
 
@@ -42,81 +48,77 @@ class ProfileService:
         if not profile:
             raise ProfileNotFoundError(str(user_id))
 
-        allowed_fields = {'first_name',
-                          'last_name', 'bio', 'username', 'email'}
+        allowed_fields = {"first_name", "last_name", "bio", "username", "email"}
         invalid_fields = set(updates.keys()) - allowed_fields
         if invalid_fields:
             raise InvalidProfileDataError(f"Invalid fields: {invalid_fields}")
 
         old_values = {
             k: getattr(profile, k)
-            for k in updates.keys()
+            for k in updates
             if hasattr(profile, k) and getattr(profile, k) != updates[k]
         }
 
         profile.update(**updates)
         updated_profile = await self.repository.update(profile)
 
-        if old_values and self.event_producer:
-            await self._send_profile_events(
+        if old_values:
+            await self._send_profile_changed(
                 user_id=updated_profile.user_id,
                 profile=updated_profile,
                 changes=updates,
-                old_values=old_values
             )
 
         return updated_profile
 
-    async def _send_profile_events(
+    async def _send_profile_changed(
         self,
         user_id: UUID,
         profile: Profile,
         changes: dict,
-        old_values: dict
-    ):
-        if 'first_name' in changes:
-            name = f"{changes['first_name']} {profile.last_name}".strip()
+    ) -> None:
+        if not profile.id:
+            return
 
-            await self.event_producer.send_event(
-                topic="user-events",
-                event_type="user.profile.updated",
-                data={
-                    "user_id": str(user_id),
-                    "name": name
-                }
-            )
+        profile_changes: Dict[str, Any] = {}
 
-        if 'email' in changes:
-            await self.event_producer.send_event(
-                topic="user-events",
-                event_type="user.email.updated",
-                data={
-                    "user_id": str(user_id),
-                    "email": changes['email']
-                }
-            )
+        if "first_name" in changes or "last_name" in changes:
+            first = changes.get("first_name", profile.first_name) or ""
+            last = changes.get("last_name", profile.last_name) or ""
+            profile_changes["name"] = f"{first} {last}".strip()
 
-        elif 'last_name' in changes and 'first_name' not in changes:
-            name = f"{profile.first_name} {changes['last_name']}".strip()
+        if "email" in changes:
+            profile_changes["email"] = changes["email"]
 
-            await self.event_producer.send_event(
-                topic="user-events",
-                event_type="user.profile.updated",
-                data={
-                    "user_id": str(user_id),
-                    "name": name
-                }
-            )
+        if "username" in changes:
+            profile_changes["username"] = changes["username"]
+
+        if "bio" in changes:
+            profile_changes["bio"] = changes["bio"]
+
+        if not profile_changes:
+            return
+
+        await self.event_producer.send_event(
+            topic=topics.PROFILE_CHANGED,
+            event_type=topics.PROFILE_CHANGED,
+            data={
+                "profile_id": str(profile.id),
+                "user_id": str(user_id),
+                "changes": profile_changes,
+            },
+        )
 
     async def delete_profile(self, user_id: UUID) -> bool:
-        """Use case: Delete profile"""
         profile = await self.repository.get_by_user_id(user_id)
+        if not profile:
+            return False
 
-        # Delete avatar from media service if exists
-        if profile and profile.avatar_url:
-            try:
-                await self.media_client.delete_avatar(profile.avatar_url)
-            except Exception as e:
-                print(f"Failed to delete avatar: {e}")
-
-        return await self.repository.delete(user_id)
+        deleted = await self.repository.delete(user_id)
+        if deleted:
+            await self.event_producer.send_event(
+                topic=topics.USER_DELETED,
+                event_type=topics.USER_DELETED,
+                data={"user_id": str(user_id)},
+            )
+        return deleted
