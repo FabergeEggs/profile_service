@@ -42,8 +42,7 @@ class ProfileService:
         if not profile:
             raise ProfileNotFoundError(str(user_id))
 
-        allowed_fields = {'first_name',
-                          'last_name', 'bio', 'username', 'email'}
+        allowed_fields = {'first_name', 'last_name', 'bio', 'username', 'email', 'avatar_url'}
         invalid_fields = set(updates.keys()) - allowed_fields
         if invalid_fields:
             raise InvalidProfileDataError(f"Invalid fields: {invalid_fields}")
@@ -74,9 +73,10 @@ class ProfileService:
         changes: dict,
         old_values: dict
     ):
-        if 'first_name' in changes:
-            name = f"{changes['first_name']} {profile.last_name}".strip()
-
+        # Publish name change if either name part was updated.
+        # profile already has the new values after repository.update().
+        if 'first_name' in changes or 'last_name' in changes:
+            name = f"{profile.first_name} {profile.last_name}".strip()
             await self.event_producer.send_event(
                 topic="user-events",
                 event_type="user.profile.updated",
@@ -96,15 +96,13 @@ class ProfileService:
                 }
             )
 
-        elif 'last_name' in changes and 'first_name' not in changes:
-            name = f"{profile.first_name} {changes['last_name']}".strip()
-
+        if 'avatar_url' in changes:
             await self.event_producer.send_event(
                 topic="user-events",
-                event_type="user.profile.updated",
+                event_type="user.avatar.updated",
                 data={
                     "user_id": str(user_id),
-                    "name": name
+                    "avatar_link": changes['avatar_url']
                 }
             )
 
