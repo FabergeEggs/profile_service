@@ -19,7 +19,15 @@ class ProfileService:
 
     async def get_profile(self, user_id: UUID) -> Optional[Profile]:
         """Use case: Get profile by user ID"""
-        return await self.repository.get_by_user_id(user_id)
+        profile = await self.repository.get_by_user_id(user_id)
+        if profile and profile.avatar_asset_id:
+            try:
+                fresh_url = await self.media_client.get_asset_download_url(profile.avatar_asset_id)
+                if fresh_url:
+                    profile.avatar_url = fresh_url
+            except Exception:
+                pass  # graceful degradation: show stale/no avatar rather than fail
+        return profile
 
     async def create_profile(self, user_id: UUID, username: str, email: str,
                              first_name: str = "", last_name: str = "",
@@ -42,10 +50,14 @@ class ProfileService:
         if not profile:
             raise ProfileNotFoundError(str(user_id))
 
-        allowed_fields = {'first_name', 'last_name', 'bio', 'username', 'email', 'avatar_url'}
+        allowed_fields = {'first_name', 'last_name', 'bio', 'username', 'email', 'avatar_url', 'avatar_asset_id'}
         invalid_fields = set(updates.keys()) - allowed_fields
         if invalid_fields:
             raise InvalidProfileDataError(f"Invalid fields: {invalid_fields}")
+
+        # When storing by asset_id, clear the stale direct URL to avoid confusion
+        if updates.get('avatar_asset_id'):
+            updates['avatar_url'] = None
 
         old_values = {
             k: getattr(profile, k)

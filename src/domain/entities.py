@@ -13,6 +13,7 @@ class Profile:
     last_name: Optional[str] = None
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
+    avatar_asset_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     

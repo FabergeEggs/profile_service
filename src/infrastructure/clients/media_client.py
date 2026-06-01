@@ -10,11 +10,20 @@ class MediaServiceHTTPClient(MediaServiceClient):
 
     async def delete_avatar(self, avatar_url: str) -> bool:
         async with httpx.AsyncClient() as client:
-            # Извлекаем ID аватара из URL
             avatar_id = avatar_url.split("/")[-1]
             response = await client.delete(
                 f"{self.base_url}/avatar/{avatar_id}",
                 headers={"x-service-token": self.service_token}
             )
-            # media_service возвращает 204 No Content при успешном удалении
             return response.status_code in (200, 204)
+
+    async def get_asset_download_url(self, asset_id: str) -> Optional[str]:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"{self.base_url}/api/v1/assets/{asset_id}",
+                headers={"x-service-token": self.service_token}
+            )
+            if response.status_code == 200:
+                body = response.json()
+                return body.get("download", {}).get("url")
+            return None

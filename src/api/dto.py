@@ -25,7 +25,8 @@ class ProfileUpdateDTO(BaseModel):
     last_name: Optional[str] = Field(None, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
     avatar_url: Optional[str] = Field(None, max_length=500)
-    
+    avatar_asset_id: Optional[str] = Field(None, max_length=36)
+
     class Config:
         extra = "forbid"  # Запрещаем лишние поля
 

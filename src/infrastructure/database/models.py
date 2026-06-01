@@ -17,5 +17,6 @@ class ProfileModel(Base):
     last_name = Column(String(100))
     bio = Column(String(500))
     avatar_url = Column(String(500))
+    avatar_asset_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=datetime.utcnow)

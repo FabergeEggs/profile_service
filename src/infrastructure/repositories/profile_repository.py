@@ -25,7 +25,8 @@ class PostgresProfileRepository(ProfileRepository):
             first_name=profile.first_name,
             last_name=profile.last_name,
             bio=profile.bio,
-            avatar_url=profile.avatar_url
+            avatar_url=profile.avatar_url,
+            avatar_asset_id=profile.avatar_asset_id,
         )
         self.session.add(model)
         await self.session.flush()
@@ -44,6 +45,7 @@ class PostgresProfileRepository(ProfileRepository):
         model.last_name = profile.last_name
         model.bio = profile.bio
         model.avatar_url = profile.avatar_url
+        model.avatar_asset_id = profile.avatar_asset_id
         
         await self.session.flush()
         await self.session.commit()
@@ -71,6 +73,7 @@ class PostgresProfileRepository(ProfileRepository):
             last_name=model.last_name,
             bio=model.bio,
             avatar_url=model.avatar_url,
+            avatar_asset_id=str(model.avatar_asset_id) if model.avatar_asset_id else None,
             created_at=model.created_at,
             updated_at=model.updated_at
         )

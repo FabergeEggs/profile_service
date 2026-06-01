@@ -29,3 +29,7 @@ class MediaServiceClient(ABC):
     @abstractmethod
     async def delete_avatar(self, avatar_url: str) -> bool:
         pass
+
+    @abstractmethod
+    async def get_asset_download_url(self, asset_id: str) -> Optional[str]:
+        pass

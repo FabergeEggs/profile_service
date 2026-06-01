@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from src.api.handlers import router
+from sqlalchemy import text
 from src.infrastructure.database.session import engine
 from src.infrastructure.database.models import Base
 from src.infrastructure.message_broker.producer import KafkaEventProducer
@@ -30,6 +31,10 @@ async def lifespan(app: FastAPI):
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Additive migration: add avatar_asset_id if not present (safe to re-run)
+        await conn.execute(
+            text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_asset_id UUID")
+        )
         print("Database tables created")
     
     yield
