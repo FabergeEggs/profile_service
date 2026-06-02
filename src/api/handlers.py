@@ -29,22 +29,14 @@ async def get_profile_internal(
 @router.get(
     "/{user_id}",
     response_model=ProfileResponseDTO,
-    responses={404: {"model": ErrorResponseDTO},
-               403: {"model": ErrorResponseDTO}}
+    responses={404: {"model": ErrorResponseDTO}}
 )
 async def get_profile(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user),
     profile_service: ProfileService = Depends(get_profile_service)
 ):
-    """Get profile by user ID"""
-    # Authorization
-    if current_user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only access your own profile"
-        )
-
+    """Get profile by user ID. Any authenticated user can read any profile."""
     try:
         profile = await profile_service.get_profile(user_id)
         if not profile:
