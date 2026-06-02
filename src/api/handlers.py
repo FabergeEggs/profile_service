@@ -7,6 +7,24 @@ from src.domain.exceptions import ProfileNotFoundError, UnauthorizedAccessError,
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
+# Internal S2S router — not exposed via KrakenD, only reachable on Docker network
+internal_router = APIRouter(prefix="/internal/profile", tags=["internal"])
+
+
+@internal_router.get("/{user_id}", response_model=ProfileResponseDTO)
+async def get_profile_internal(
+    user_id: UUID,
+    profile_service: ProfileService = Depends(get_profile_service),
+):
+    """S2S: read any profile without JWT. Only reachable inside Docker network."""
+    try:
+        profile = await profile_service.get_profile(user_id)
+        if not profile:
+            raise ProfileNotFoundError(str(user_id))
+        return ProfileResponseDTO.model_validate(profile)
+    except ProfileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
 
 @router.get(
     "/{user_id}",

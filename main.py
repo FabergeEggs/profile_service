@@ -1,7 +1,7 @@
 # Замените содержимое main.py на это:
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from src.api.handlers import router
+from src.api.handlers import router, internal_router
 from sqlalchemy import text
 from src.infrastructure.database.session import engine
 from src.infrastructure.database.models import Base
@@ -61,6 +61,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(internal_router)
 
 @app.get("/health")
 async def health():
